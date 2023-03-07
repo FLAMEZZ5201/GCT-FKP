@@ -4,15 +4,13 @@ import numpy as np
 from torch.utils.data import DataLoader
 import time
 from torch.utils.tensorboard import SummaryWriter
-
 from dataset import MyDataset
 import tools
 from collections import OrderedDict
-from Dmodel import DRFKNet
 import visualizer
-from GraFormer import adj_mx_from_edges, GraFormer
+from GCT import adj_mx_from_edges, GCT
 from semgcn.Semgcn import SemGCN
-from GCT import GCT
+
 def main():
     # Network Arguments
     args = {}
