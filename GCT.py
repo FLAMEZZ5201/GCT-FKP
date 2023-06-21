@@ -1,8 +1,6 @@
 from __future__ import absolute_import
-
 import sys
 from collections import OrderedDict
-
 import torch.nn as nn
 import torch
 import numpy as np
@@ -11,9 +9,8 @@ import copy, math
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torchsummary import summary
-
 from ChebConv import ChebConv, _ResChebGC
-from semgcn.sem_graph_conv import SemGraphConv
+from sem_graph_conv import SemGraphConv
 
 def normalize(mx):
     """Row-normalize sparse matrix"""
