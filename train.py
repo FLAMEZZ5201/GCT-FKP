@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-
 from torch.utils.data import DataLoader
 import time
 from torch.utils.tensorboard import SummaryWriter
@@ -8,9 +7,8 @@ from dataset import MyDataset
 import tools
 from collections import OrderedDict
 import visualizer
-from GCT import adj_mx_from_edges, GCT
-from semgcn.Semgcn import SemGCN
-
+from GCT import adj_mx_from_edges
+from GCT import GCT
 def main():
     # Network Arguments
     args = {}
@@ -24,8 +22,8 @@ def main():
     src_mask = torch.tensor([[[True, True, True, True, True, True, True, True, True, True, True,
                                True]]]).cuda()
     writer = SummaryWriter("logs")
-    # Initialize network
-    # net = DRFKNet().double()
+   
+
     # k-hop matrix
     gan_edges = (np.array([[1, 2], [1, 6], [2, 3], [3, 4], [4, 5], [5, 6], [7, 8],
                           [7, 12], [8, 9], [9, 10], [10, 11], [11, 12], [1, 7],
@@ -41,31 +39,20 @@ def main():
                           [4, 12], [4, 8], [4, 1],
                           [5, 7], [5, 9], [5, 2],
                           [6, 8], [6, 10], [6, 3]])-1)
-    adj = adj_mx_from_edges(num_pts=12, edges=gan_edges, sparse= False).cuda()
+    adj = adj_mx_from_edges(num_pts=12, edges=gan_edges, sparse=False).cuda()
     adj1 = adj_mx_from_edges(num_pts=12, edges=gan_edges1, sparse=False).cuda()
     adj2 = adj_mx_from_edges(num_pts=12, edges=gan_edges2, sparse=False).cuda()
+    # Initialize network
     net = GCT(adj, adj1, adj2).double()
-
     device = torch.device('cuda:0')
-    #pre train model
-    # path = "Semgcn_499_9D.pth"
-    # checkpoint = torch.load(path, map_location=device)
-    # net = checkpoint
-    # dict_trained = torch.load('best_modeldict_9D_325.pth', map_location=torch.device('cpu'))
-    # dict_new = net.state_dict()
-    # net_dict = net.state_dict()
-    # 1. filter out unnecessary keys
-    # dict_trained = {k: v for k, v in dict_trained.items() if k in dict_new}
-    # 2. overwrite entries in the existing state dict
-    # net_dict.update(dict_trained)
-    # net.load_state_dict(dict_new)
     net.to(device)
     ## Initialize optimizer
     ## pretrainEpochs = 5
     trainEpochs = 800
     mean_criterion1 = torch.nn.MSELoss(reduction='mean')
+    mean_criterion2 = torch.nn.L1Loss(reduction='mean')
     # mean_criterion2 = torch.nn.MSELoss(reduction='mean')
-    lr = 0.0001
+    lr = 0.001
 
     batch_size = 4000
     beta = 200
@@ -108,31 +95,21 @@ def main():
             data1 = input_data.view(input_data.shape[0], 12, 12)
             nonZeroRows = torch.abs(data1) > 0
             input_feature = data1[nonZeroRows].view(input_data.shape[0], 12, 3).cuda()
-
             train_num += 1
-
-
             # Forward pass
-
+            # pre_value = net(input_feature)
             pre_value = net(input_feature, src_mask)
 
             # Loss computation
             pre_motion = pre_value[:, 0:3].cuda()
             pre_rotation = pre_value[:, 3:].cuda()
-
-
             loss_weights = [0.3, 0.3, 1]
             # rm1 = tools.compute_rotation_matrix_from_quaternion(pre_rotation).cuda()
             rm2 = tools.compute_rotation_matrix_from_quaternion(gt_rotation).cuda()
             orm1 = tools.symmetric_orthogonalization(pre_rotation).cuda()
-
-
             mse_pos = mean_criterion1(pre_motion, gt_motion)
             mse_ori = mean_criterion1(rm2, orm1)
-
-            # mse_dis = mean_criterion1(Ikp_dis, l_dis)
-
-            loss_G = (mse_pos + mse_ori * beta)
+            loss_G = (mse_pos + mse_ori * beta) 
             loss += loss_G
             # Backprop and update weights
             optimizer.zero_grad()
@@ -141,12 +118,10 @@ def main():
 
             #  lr = adjust_learning_rate_by_epoch(optimizer, epoch, trainEpochs)
             if iteration % log_frequency == 0:
-                err_pos = torch.dist(pre_motion,gt_motion)
+                err_pos = torch.norm(pre_motion-gt_motion, dim=-1).mean()
                 err_deg = torch.rad2deg(tools.compute_geodesic_distance_from_two_matrices(rm2,orm1))
                 writer.add_scalar('train/pos_mean', err_pos.mean().item(), iteration)
                 writer.add_scalar('train/ori_mean', err_deg.mean().item(), iteration)
-
-
 
             if total_steps % print_freq == 0:
                 errors = get_current_errors(pre_motion, gt_motion, rm2, orm1, args['isTrain'])
@@ -181,23 +156,22 @@ def main():
 
 
                 # Forward pass
-
+                # pre_value = net(input_feature)
                 pre_value = net(input_feature, src_mask)
 
 
                 # Loss computation
                 pre_motion = pre_value[:, 0:3].cuda()
                 pre_rotation = pre_value[:, 3:].cuda()
-
                 rm2 = tools.compute_rotation_matrix_from_quaternion(gt_rotation).cuda()
                 orm1 = tools.symmetric_orthogonalization(pre_rotation).cuda()
                 mse_pos = mean_criterion1(pre_motion, gt_motion)
                 mse_ori = mean_criterion1(rm2, orm1)
-                loss_v = (mse_pos + mse_ori * beta)
+                loss_v = (mse_pos + mse_ori * beta) 
                 loss_val += loss_v
 
                 if iteration % val_frequency == 0:
-                    # err_pos = torch.dist(pre_motion, gt_motion)
+                    err_pos = torch.norm((pre_motion-gt_motion)*10, dim=-1).mean()
                     err_pos1 = torch.abs((pre_motion-gt_motion))
                     err_deg = torch.rad2deg(tools.compute_geodesic_distance_from_two_matrices(rm2, orm1))
                     writer.add_scalar('test/pos_mean', err_pos.mean().item(), iteration)
@@ -206,6 +180,7 @@ def main():
                     test_err_deg = np.append(test_err_deg, err_deg.detach().cpu().numpy())
                     writer.add_scalar('test/ori_err_median', np.median(test_err_deg), iteration)
                     writer.add_scalar('test/ori_err_mean', np.mean(test_err_deg), iteration)
+
                     writer.add_scalar('test/ori_err_max', np.max(test_err_deg), iteration)
                     writer.add_scalar('test/acc_0.1deg', (test_err_deg < 0.1).sum() / len(test_err_deg),
                                       iteration)
@@ -311,13 +286,7 @@ def get_current_errors(mpred, minput, rpred, rinput, isTrain):
 
 
 
-
-
-
-
-
 if __name__ == '__main__':
     main()
-
 
 
