@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import sys
 from collections import OrderedDict
 
 import torch.nn as nn
@@ -9,6 +10,8 @@ import scipy.sparse as sp
 import copy, math
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
+from torchsummary import summary
+
 from ChebConv import ChebConv, _ResChebGC
 from semgcn.sem_graph_conv import SemGraphConv
 
@@ -215,7 +218,7 @@ class GraphNet(nn.Module):
 
 class ChebGAC(nn.Module):
 
-    def __init__(self, adj1, adj2, adj3, in_features=3, out_features=96):
+    def __init__(self, adj1, adj2, adj3, in_features=3, out_features=12):
         super(ChebGAC, self).__init__()
         self.hop1 = adj1
         self.hop2 = adj2
@@ -223,20 +226,20 @@ class ChebGAC(nn.Module):
         self.gconv1 = ChebConv(in_c=in_features, out_c=out_features, K=2)
         self.gconv2 = ChebConv(in_c=in_features, out_c=out_features, K=2)
         self.gconv3 = ChebConv(in_c=in_features, out_c=out_features, K=2)
-        self.fc = nn.Linear(in_features=12*96*3, out_features=12*out_features)
+        self.fc = nn.Linear(in_features=12*12*3, out_features=12*out_features)
         self.act_fn = nn.ReLU()
     def forward(self, X):
         X_0 = self.gconv1(X, self.hop1)
         X_1 = self.gconv2(X, self.hop2)
         X_2 = self.gconv3(X, self.hop2)
         x = torch.cat([X_0, X_1, X_2], dim=1)
-        x = x.view(x.shape[0], 12 * 96 * 3)
+        x = x.view(x.shape[0], 12 * 12 * 3)
         z0 = self.fc(x)
-        z0 = z0.view(z0.shape[0], 12, 96)
+        z0 = z0.view(z0.shape[0], 12, 12)
         z1 = X_0*X_1
         z2 = X_1*X_2
         x = self.act_fn(z0+z1+z2)
-        return x.view(x.shape[0], 12, 96)
+        return x.view(x.shape[0], 12, 12)
 
 class _GraphsConv(nn.Module):
     def __init__(self, adj, input_dim, output_dim, p_dropout=None):
@@ -272,6 +275,7 @@ class _ResGraphConv(nn.Module):
         out = self.gconv2(out)
         return residual + out
 
+
 class GCT(nn.Module):
     def __init__(self, adj, adj1, adj2, hid_dim=96, coords_dim=(3, 3), num_layers=4,
                  n_head=4, dropout=0.1, n_pts=12):
@@ -288,13 +292,15 @@ class GCT(nn.Module):
         c = copy.deepcopy
         attn = MultiHeadedAttention(n_head, dim_model)
         gcn = GraphNet(in_features=dim_model, out_features=dim_model, n_pts=n_pts)
+        semg = SemGraphConv(in_features=12, out_features=96, adj=self.adj)
 
         for i in range(num_layers):
-            _gconv_layers.append(_ResGraphConv(adj=self.adj, input_dim=hid_dim, output_dim=hid_dim,
+            _gconv_layers.append(_ResGraphConv(adj=self.adj, input_dim=96, output_dim=hid_dim,
                                             hid_dim=hid_dim, p_dropout=0.1))
             _attention_layer.append(GraAttenLayer(dim_model, c(attn), c(gcn), dropout))
 
         self.gconv_input = _gconv_input
+        self.semg = semg
         self.gconv_layers = nn.ModuleList(_gconv_layers)
         self.atten_layers = nn.ModuleList(_attention_layer)
         self.gconv_output1 = ChebConv(in_c=dim_model, out_c=3, K=2)
@@ -316,6 +322,7 @@ class GCT(nn.Module):
 
     def forward(self, x, mask):
         x = self.chebgca(x)
+        x = self.semg(x)
         res1 = x
         out = x
         for i in range(self.n_layers):
@@ -332,7 +339,8 @@ class GCT(nn.Module):
 
         out1 = out1.view(out1.shape[0], 36)
         out2 = out2.view(out2.shape[0], 48)
-        # out = nn.Linear(36, 7, dtype=torch.double)(out)
+        # out1 = nn.Linear(3, 3, dtype=torch.double)(out1)
+        # out2 = nn.Linear(9, 9, dtype=torch.double)(out2)
         out1 = self.DLayer1(out1)
         out2 = self.DLayer2(out2)
         out = torch.cat([out1, out2], dim=1)
@@ -340,5 +348,37 @@ class GCT(nn.Module):
 
 
 
+if __name__ == '__main__':
+    gan_edges = (np.array([[1, 2], [1, 6], [2, 3], [3, 4], [4, 5], [5, 6], [7, 8],
+                           [7, 12], [8, 9], [9, 10], [10, 11], [11, 12], [1, 7],
+                           [2, 8], [3, 9], [4, 10], [5, 11], [6, 12]]) - 1)
 
+    gan_edges1 = (np.array([[1, 8], [1, 12], [1, 3], [1, 5], [2, 9], [2, 7], [2, 4],
+                            [2, 6], [3, 10], [3, 8], [3, 5], [3, 1], [4, 11],
+                            [4, 9], [4, 6], [4, 2], [5, 12], [5, 10], [5, 1], [5, 3], [6, 7], [6, 11], [6, 2],
+                            [6, 4]]) - 1)
+
+    gan_edges2 = (np.array([[1, 9], [1, 11], [1, 4],
+                            [2, 10], [2, 12], [2, 5],
+                            [3, 11], [3, 7], [3, 6],
+                            [4, 12], [4, 8], [4, 1],
+                            [5, 7], [5, 9], [5, 2],
+                            [6, 8], [6, 10], [6, 3]]) - 1)
+    adj = adj_mx_from_edges(num_pts=12, edges=gan_edges, sparse=False).cuda()
+    adj1 = adj_mx_from_edges(num_pts=12, edges=gan_edges1, sparse=False).cuda()
+    adj2 = adj_mx_from_edges(num_pts=12, edges=gan_edges2, sparse=False).cuda()
+    net = GCT(adj, adj1, adj2).double()
+    src_mask = torch.tensor([[[True, True, True, True, True, True, True, True, True, True, True,
+                               True]]]).cuda()
+    device = torch.device("cuda:0")
+    net.to(device)
+
+    # generate some example data on the GPU
+    x = torch.randn((1000, 12, 3), dtype=torch.double).to(device)
+    print(x)
+    total_params = sum(p.numel() for p in net.parameters())
+    print(f"Total number of parameters: {total_params}")
+
+    # call the summary method on the model
+    summary(net(x, src_mask), input_size=(24, 12))
 
