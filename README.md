@@ -1,11 +1,14 @@
-# GCT-FKP
+# Graph-Geometric Message Passing via Graph Convolution Transformer for FKP Regression
 We propose a graph convolution transformer to solve the forward kinematics problem of Gough-Stewart platform.
+
+Gough-Stewart platform:
+<div align=center><img src="https://github.com/FLAMEZZ5201/GCT-FKP/blob/main/GSP.jpg" width="300" height="280"/></div><br>
 
 Framework:
 <div align=center><img src="https://github.com/FLAMEZZ5201/GCT-FKP/blob/main/gct-fpk.jpg" width="600" height="280"/></div><br>
 
-Layer architecture:
-<div align=center><img src="https://github.com/hanna-xu/DDcGAN/blob/master/figures/Generator.png" width="520" height="280"/></div><br>
+Block architecture:
+<div align=center><img src="https://github.com/FLAMEZZ5201/GCT-FKP/blob/main/blocks.jpg" width="500" height="250"/></div><br>
 
 # Dependencies
 * CUDA 11.3
