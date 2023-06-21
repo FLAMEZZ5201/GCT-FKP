@@ -8,7 +8,7 @@ Framework:
 <div align=center><img src="https://github.com/FLAMEZZ5201/GCT-FKP/blob/main/gct-fpk.jpg" width="600" height="280"/></div><br>
 
 ChebGAC Layer:
-<div align=center><img src="https://github.com/FLAMEZZ5201/GCT-FKP/blob/main/gac-fkp.jpg" width="600" height="280"/></div><br>
+<div align=center><img src="https://github.com/FLAMEZZ5201/GCT-FKP/blob/main/gac-fkp.jpg" width="500" height="280"/></div><br>
 
 Block architecture:
 <div align=center><img src="https://github.com/FLAMEZZ5201/GCT-FKP/blob/main/blocks.jpg" width="500" height="250"/></div><br>
