@@ -1,5 +1,7 @@
 # GCT-FKP
 We propose a graph convolution transformer to solve the forward kinematics problem of Gough-Stewart platform.
+
+![img](\GCT-FKP.jpg)
 # Dependencies
 * CUDA 11.3
 
