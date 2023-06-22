@@ -1,5 +1,5 @@
 # Graph-Geometric Message Passing via Graph Convolution Transformer for FKP Regression
-We propose a graph convolution transformer to solve the forward kinematics problem of Gough-Stewart platform.
+A graph convolution transformer to solve the forward kinematics problem of Gough-Stewart platform.
 
 Gough-Stewart platform:
 <div align=center><img src="https://github.com/FLAMEZZ5201/GCT-FKP/blob/main/GSP.jpg" width="300" height="250"/></div><br>
