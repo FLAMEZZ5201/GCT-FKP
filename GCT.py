@@ -376,6 +376,4 @@ if __name__ == '__main__':
     total_params = sum(p.numel() for p in net.parameters())
     print(f"Total number of parameters: {total_params}")
 
-    # call the summary method on the model
-    summary(net(x, src_mask), input_size=(24, 12))
 
